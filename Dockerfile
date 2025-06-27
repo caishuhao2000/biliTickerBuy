@@ -1,5 +1,9 @@
 FROM python:3.12
 WORKDIR /app
+RUN cp /etc/apt/sources.list.d/debian.sources /etc/apt/sources.list.d/debian.sources.bak
+
+RUN sed -i 's|URIs: http://deb.debian.org/debian|URIs: https://mirrors.aliyun.com/debian|g' /etc/apt/sources.list.d/debian.sources
+
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     curl tzdata xvfb x11vnc supervisor xauth \
@@ -23,6 +27,8 @@ RUN apt-get update --allow-unauthenticated && \
     libgtk-3-0 libgbm1 libasound2 && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
+RUN playwright install-deps
+RUN playwright install
 
 ENV BTB_SERVER_NAME="0.0.0.0"
 ENV GRADIO_SERVER_PORT=7860

@@ -91,7 +91,9 @@ def buy_stream(
             pass
 
     while isRunning:
+        inStock = True
         try:
+
             yield "1）订单准备"
             request_result_normal = _request.post(
                 url=f"https://show.bilibili.com/api/ticket/order/prepare?project_id={tickets_info['project_id']}",
@@ -153,6 +155,51 @@ def buy_stream(
                 ).json()
                 yield f"prepare: {request_result}"
 
+
+            yield "查询余票中"
+            inStock = False
+            err = 0
+            errname = ""
+            for attempt in range(1, 61):
+                if inStock:
+                    break
+                ret = _request.get(
+                    url=f"https://show.bilibili.com/api/ticket/project/getV2?id={tickets_info['project_id']}&project_id={tickets_info['project_id']}",
+                    isJson=True
+                )
+                respond = ret.json()
+                detail = respond["data"]["screen_list"]
+                for i in range(len(detail)):
+                    ticket_oneday = detail[i]
+                    err = ticket_oneday["saleFlag"]["number"]
+                    errname = ticket_oneday["saleFlag"]["display_name"]
+                    if ticket_oneday["saleFlag"]["number"] != 8 and ticket_oneday["saleFlag"]["number"] != 4 and \
+                            ticket_oneday["saleFlag"]["number"] != 5 and ticket_oneday["saleFlag"]["number"] != 1:
+                        print(ticket_oneday["name"], ticket_oneday["saleFlag"]["display_name"])
+                        # print(ticket_oneday["saleFlag"]["number"])
+                        for j in range(len(ticket_oneday["ticket_list"])):
+                            ticket_oneclass = ticket_oneday["ticket_list"][j]
+                            if ticket_oneclass['id'] != tickets_info["sku_id"]:
+                                continue
+                            err = ticket_oneclass["sale_flag"]["number"]
+                            errname = ticket_oneday["saleFlag"]["display_name"]
+                            if ticket_oneclass["sale_flag"]["number"] != 8 and ticket_oneclass["sale_flag"][
+                                "number"] != 4 and ticket_oneclass["sale_flag"]["number"] != 5 and \
+                                    ticket_oneclass["sale_flag"]["number"] != 1:
+                                inStock = True
+                                break
+                                # my_msg = ticket_oneday["name"] + " -" + ticket_oneclass["desc"] + " in stock"
+                                # send_url = send_url.format(server=server_addr, key=my_key, title=my_title, msg=my_msg)
+                                # sendr = requests.get(send_url)
+                                print("-", ticket_oneclass["desc"], ticket_oneclass["sale_flag"]["display_name"])
+                # err = int(ret.get("errno", ret.get("code")))
+
+                if not inStock:
+                    yield f"[Attempt {attempt}/60] Out of Stock. " + "error name: " + errname
+                    time.sleep(interval / 1000)
+            else:
+                yield "重试次数过多，重新准备订单"
+                continue
             tickets_info["again"] = 1
             tickets_info["token"] = request_result["data"]["token"]
             yield "2）创建订单"
